@@ -85,5 +85,4 @@ virsh shutdown cloud-init-001
 
 ## TODO
 
-- Install metrics server
 - Setup external ingress.
