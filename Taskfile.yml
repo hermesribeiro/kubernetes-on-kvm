@@ -1,0 +1,185 @@
+version: 3
+
+dotenv: ['secrets.env']
+
+vars:
+  MEMORY: 3000
+  VCPU: 2
+  DISK_SIZE: 20
+  BRIDGE_NAME: br0
+  GATEWAY_IP: 192.168.0.1
+  LOADBALANCER_IP: 192.168.0.80
+  NODE01_IP: 192.168.0.81
+  NODE02_IP: 192.168.0.82
+  NODE03_IP: 192.168.0.83
+  NODE04_IP: 192.168.0.84
+  NODE05_IP: 192.168.0.85
+
+tasks:
+  install:
+    cmds:
+      - sudo apt-get install qemu-kvm virt-manager virtinst libvirt-clients bridge-utils libvirt-daemon-system -y
+      - sudo systemctl enable --now libvirtd
+      - sudo systemctl start libvirtd
+      - sudo systemctl status libvirtd
+      - sudo usermod -aG kvm $USER
+      - sudo usermod -aG libvirt $USER
+      - echo You should reboot before proceeding
+
+  dowload-image:
+    cmds:
+      - wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+  create-machine:
+    cmds:
+      - |
+        sed \
+        -e 's/HOST_NAME/{{.NAME}}/g' \
+        -e 's/SSH_IMPORT_ID/{{.SSH_IMPORT_ID}}/' \
+        -e 's@PASSWD_HASH@{{.PASSWD_HASH}}@g' \
+        user-data.yaml > configs/{{.NAME}}-user-data.yaml
+      - |
+        sed \
+        -e 's/NODE_IP/{{.NODE_IP}}/g' \
+        -e 's/GATEWAY_IP/{{.GATEWAY_IP}}/g' \
+        network-config.yaml > configs/{{.NAME}}-network-config.yaml
+      - |
+        virt-install --name {{.NAME}} --memory {{.MEMORY}} --vcpus {{.VCPU}} \
+          --os-variant detect=on,name=ubuntujammy \
+          --disk=size={{.DISK_SIZE}},backing_store="$(pwd)/jammy-server-cloudimg-amd64.img" \
+          --cloud-init user-data=configs/{{.NAME}}-user-data.yaml,network-config=configs/{{.NAME}}-network-config.yaml \
+          --network bridge={{.BRIDGE_NAME}},model=virtio \
+      - virsh start {{.NAME}}
+
+  delete-machine:
+    cmds:
+      - virsh destroy {{.NAME}} || true
+      - virsh undefine --domain {{.NAME}} || true
+      - sudo rm /var/lib/libvirt/images/{{.NAME}}.qcow2 || true
+
+  bootstrap-master:
+    cmds:
+      - scp scripts/* {{.NODE_IP}}:/home/sobeck
+      - |
+        ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
+          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
+      - ssh {{.NODE01_IP}} bash join.sh | xargs -I% ssh {{.NODE_IP}} sudo %
+      - ssh {{.NODE_IP}} bash kctl.sh
+
+  first-node:
+    cmds:
+      - scp scripts/* {{.NODE_IP}}:/home/sobeck
+      - |
+        ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
+          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
+      - ssh {{.NODE_IP}} bash init.sh {{.LOADBALANCER_IP}}
+    vars:
+      NODE_IP: '{{.NODE01_IP}}'
+      PEER1_IP: '{{.NODE02_IP}}'
+      PEER2_IP: '{{.NODE03_IP}}'
+      PEER3_IP: '{{.NODE04_IP}}'
+      PEER4_IP: '{{.NODE05_IP}}'
+ 
+  create-machines-host1:
+    cmds:
+      - task: create-machine
+        vars:
+          NAME: node01
+          NODE_IP: '{{.NODE01_IP}}'
+      - task: create-machine
+        vars:
+          NAME: node02
+          NODE_IP: '{{.NODE02_IP}}'
+      - task: create-machine
+        vars:
+          NAME: node03
+          NODE_IP: '{{.NODE03_IP}}'
+
+  delete-machines-host1:
+    cmds:
+      - task: delete-machine
+        vars:
+          NAME: node01
+      - task: delete-machine
+        vars:
+          NAME: node02
+      - task: delete-machine
+        vars:
+          NAME: node03
+
+  bootstrap-machines-host1:
+    cmds:
+      - task: bootstrap-master
+        vars:
+          NODE_IP: '{{.NODE02_IP}}'
+          PEER1_IP: '{{.NODE01_IP}}'
+          PEER2_IP: '{{.NODE03_IP}}'
+          PEER3_IP: '{{.NODE04_IP}}'
+          PEER4_IP: '{{.NODE05_IP}}'
+      - task: bootstrap-master
+        vars:
+          NODE_IP: '{{.NODE03_IP}}'
+          PEER1_IP: '{{.NODE01_IP}}'
+          PEER2_IP: '{{.NODE02_IP}}'
+          PEER3_IP: '{{.NODE04_IP}}'
+          PEER4_IP: '{{.NODE05_IP}}'
+
+  host1:
+    cmds:
+      - task: delete-machines-host1
+      - task: create-machines-host1
+      - task: first-node
+      - task: bootstrap-machines-host1
+      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
+
+  create-machines-host2:
+    cmds:
+      - task: create-machine
+        vars:
+          NAME: node04
+          NODE_IP: '{{.NODE04_IP}}'
+      - task: create-machine
+        vars:
+          NAME: node05
+          NODE_IP: '{{.NODE05_IP}}'
+
+  delete-machines-host2:
+    cmds:
+      - task: delete-machine
+        vars:
+          NAME: node04
+      - task: delete-machine
+        vars:
+          NAME: node05
+
+  bootstrap-machines-host2:
+    cmds:
+      - task: bootstrap-master
+        vars:
+          NODE_IP: '{{.NODE04_IP}}'
+          PEER1_IP: '{{.NODE01_IP}}'
+          PEER2_IP: '{{.NODE02_IP}}'
+          PEER3_IP: '{{.NODE03_IP}}'
+          PEER4_IP: '{{.NODE05_IP}}'
+      - task: bootstrap-master
+        vars:
+          NODE_IP: '{{.NODE05_IP}}'
+          PEER1_IP: '{{.NODE01_IP}}'
+          PEER2_IP: '{{.NODE02_IP}}'
+          PEER3_IP: '{{.NODE03_IP}}'
+          PEER4_IP: '{{.NODE04_IP}}'
+
+  host2:
+    cmds:
+      - task: delete-machines-host2
+      - task: create-machines-host2
+      - task: bootstrap-machines-host2
+      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
+
+  kubeconfig:
+    cmds:
+      - mkdir -p ~/.kube
+      - cp ~/.kube/config ~/.kube/config-backup
+      - ssh {{.NODE01_IP}} sudo kubeadm kubeconfig user --client-name=sobeck > /tmp/sobeck.conf
+      - ssh {{.NODE01_IP}} kubectl create clusterrolebinding sobeck-cluster-admin-binding --clusterrole=cluster-admin --user=sobeck
+      - KUBECONFIG=~/.kube/config:/tmp/sobeck.conf kubectl config view --flatten > ~/.kube/config
