@@ -1,0 +1,53 @@
+#cloud-config
+hostname: HOST_NAME
+groups:
+  - admingroup: [root,sys]
+  - cloud-users
+  - docker
+
+users:
+  - name: sobeck
+    gecos: Elisabet Sobeck
+    ssh_import_id:
+      - SSH_IMPORT_ID
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin, docker
+    lock_passwd: false
+    passwd: PASSWD_HASH
+    chpasswd:
+      expire: False
+    shell: /bin/bash
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - apt-transport-https
+
+# Install docker
+# Waiting for https://github.com/canonical/cloud-init/issues/4076
+runcmd:
+  - sudo install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - sudo chmod a+r /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - sudo apt-get update
+  - sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Install kubernetes
+  - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+  - sudo apt-get update
+  - sudo apt-get install -y kubelet kubeadm kubectl
+  - sudo apt-mark hold kubelet kubeadm kubectl
+  - sudo rm /etc/containerd/config.toml
+  - containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+  - sudo systemctl restart containerd
+  - sudo crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock --set image-endpoint=unix:///run/containerd/containerd.sock
+
+power_state:
+ mode: poweroff
+ message: Bye Bye
