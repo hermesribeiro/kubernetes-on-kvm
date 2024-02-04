@@ -85,4 +85,7 @@ virsh shutdown cloud-init-001
 
 ## TODO
 
+- Test policy delete
 - Setup external ingress.
+- Force LB IP in kubeconfig
+- Replace installs with ArgoCD
