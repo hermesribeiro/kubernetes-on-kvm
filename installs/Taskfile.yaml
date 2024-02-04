@@ -1,6 +1,48 @@
 version: '3'
 
+env:
+  node01: 192.168.0.81
+  node02: 192.168.0.82
+  node03: 192.168.0.83
+  node04: 192.168.0.84
+  node05: 192.168.0.85
+
 tasks:
   metrics-server:
     cmds:
       - bash metrics-server/install.sh
+
+  cloudpg:
+    cmds:
+      - bash cloudpg/install.sh
+
+  pg:
+    deps:
+      - cloudpg
+
+    cmds:
+      - kubectl apply -f apollodb/cluster.yaml
+
+  namespaces:
+    cmds:
+      - kubectl apply -f namespaces/apollodb.yaml
+
+  vol01:
+    cmds:
+      - for: ['node01', 'node02', 'node03', 'node04', 'node05']
+        cmd: |
+             ssh ${{ .ITEM }} sudo mkdir -p /mnt/disk/{{ .VOL_NAME }} \
+             && sed \
+             -e 's/NODE_NAME/{{ .ITEM }}/g' \
+             -e 's/VOL_NAME/{{ .VOL_NAME }}/g' \
+             -e 's/VOL_SIZE/{{ .VOL_SIZE }}/g' \
+             localpv/pv-template.yaml > /tmp/{{ .ITEM }}{{ .VOL_NAME }}.yaml \
+             && kubectl apply -f /tmp/{{ .ITEM }}{{ .VOL_NAME }}.yaml
+    vars: 
+      VOL_NAME: 'vol1'
+      VOL_SIZE: '2Gi'
+
+  localpv:
+    cmds:
+      - kubectl apply -f localpv/storageclass.yaml
+      - task: vol01
