@@ -85,7 +85,13 @@ virsh shutdown cloud-init-001
 
 ## TODO
 
-- Test policy delete
+- Finish configuring PG
+- Install Rally
 - Setup external ingress.
 - Force LB IP in kubeconfig
+
+## Future work backlog
+
+- Port cluster creation to ClusterAPI
 - Replace installs with ArgoCD
+- Dynamic PV provisioning

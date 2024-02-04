@@ -46,3 +46,24 @@ tasks:
     cmds:
       - kubectl apply -f localpv/storageclass.yaml
       - task: vol01
+
+  localpv-cleanup:
+    cmds:
+      - for: ['node01', 'node02', 'node03', 'node04', 'node05']
+        cmd: |
+             sed \
+             -e 's/NODE_NAME/{{ .ITEM }}/g' \
+             -e 's/VOL_NAME/{{ .VOL_NAME }}/g' \
+             -e 's/VOL_SIZE/{{ .VOL_SIZE }}/g' \
+             localpv/pv-template.yaml > /tmp/{{ .ITEM }}{{ .VOL_NAME }}.yaml \
+             && kubectl delete -f /tmp/{{ .ITEM }}{{ .VOL_NAME }}.yaml \
+             && ssh ${{ .ITEM }} sudo rm -rf /mnt/disk/{{ .VOL_NAME }}
+    vars: 
+      VOL_NAME: 'vol1'
+      VOL_SIZE: '2Gi'
+
+  pg-cleanup:
+    cmds:
+      - kubectl delete -f apollodb/cluster.yaml
+      - task: localpv-cleanup
+      
