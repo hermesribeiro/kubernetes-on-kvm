@@ -2,3 +2,6 @@
 *.swp
 /configs/
 secrets.env
+.gitsecret/keys/random_seed
+!*.secret
+installs/apollodb/secrets.yaml

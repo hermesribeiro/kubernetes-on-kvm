@@ -6,6 +6,17 @@ metadata:
 spec:
   instances: 3
 
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: apollodb-app-user
+
+  enableSuperuserAccess: true
+  superuserSecret:
+    name: apollodb-superuser
+
   storage:
-    size: 1Gi
+    size: 2Gi
     storageClass: local-storage-class
