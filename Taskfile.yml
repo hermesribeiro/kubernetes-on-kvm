@@ -26,7 +26,7 @@ tasks:
       - sudo usermod -aG libvirt $USER
       - echo You should reboot before proceeding
 
-  dowload-image:
+  download-image:
     cmds:
       - wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
 
