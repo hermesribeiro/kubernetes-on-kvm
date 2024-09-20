@@ -2,6 +2,10 @@ network:
   version: 2
   ethernets:
     enp1s0:
-     dhcp4: no
-     addresses: [NODE_IP/24]
-     gateway4: GATEWAY_IP
+      dhcp4: no
+      addresses: [NODE_IP/24]
+      gateway4: GATEWAY_IP
+      nameservers:
+        addresses:
+        - 192.168.0.1
+        - 8.8.8.8

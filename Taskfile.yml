@@ -60,6 +60,7 @@ tasks:
   bootstrap-master:
     cmds:
       - scp scripts/* {{.NODE_IP}}:/home/sobeck
+      - ssh {{.NODE_IP}} bash pre.sh
       - |
         ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
           {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
@@ -69,6 +70,7 @@ tasks:
   first-node:
     cmds:
       - scp scripts/* {{.NODE_IP}}:/home/sobeck
+      - ssh {{.NODE_IP}} bash pre.sh
       - |
         ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
           {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
