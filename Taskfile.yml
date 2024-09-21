@@ -12,7 +12,6 @@ vars:
   NODE01_IP: 192.168.0.81
   NODE02_IP: 192.168.0.82
   NODE03_IP: 192.168.0.83
-  NODE04_IP: 192.168.0.84
 
 tasks:
   install:
@@ -56,113 +55,135 @@ tasks:
       - virsh undefine --domain {{.NAME}} || true
       - sudo rm /var/lib/libvirt/images/{{.NAME}}.qcow2 || true
 
-  bootstrap-master:
+  prepare-control-plane-node:
     cmds:
       - scp scripts/* {{.NODE_IP}}:/home/sobeck
       - ssh {{.NODE_IP}} bash pre.sh
-      - |
-        ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
-          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}}
-      - ssh {{.NODE01_IP}} bash join.sh | xargs -I% ssh {{.NODE_IP}} sudo %
-      - ssh {{.NODE_IP}} bash kctl.sh
+      - ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} {{.PEER1_IP}} {{.PEER2_IP}}
 
-  first-node:
+  init-control-plane-node:
     cmds:
-      - scp scripts/* {{.NODE_IP}}:/home/sobeck
-      - ssh {{.NODE_IP}} bash pre.sh
-      - |
-        ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
-          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}}
+      - task: prepare-control-plane-node
+        vars:
+          NODE_IP: '{{.NODE_IP}}'
+          PEER1_IP: '{{.PEER1_IP}}'
+          PEER2_IP: '{{.PEER2_IP}}'
       - ssh {{.NODE_IP}} bash init.sh {{.LOADBALANCER_IP}}
     vars:
-      NODE_IP: '{{.NODE01_IP}}'
-      PEER1_IP: '{{.NODE02_IP}}'
-      PEER2_IP: '{{.NODE03_IP}}'
-      PEER3_IP: '{{.NODE04_IP}}'
- 
-  create-machines-host1:
+      NODE_IP: '{{.NODE_IP}}'
+      PEER1_IP: '{{.PEER1_IP}}'
+      PEER2_IP: '{{.PEER2_IP}}'
+
+  bootstrap-control-plane-node:
+    cmds:
+      - task: prepare-control-plane-node
+        vars:
+          NODE_IP: '{{.NODE_IP}}'
+          PEER1_IP: '{{.PEER1_IP}}'
+          PEER2_IP: '{{.PEER2_IP}}'
+      - ssh {{.NODE01_IP}} bash join.sh | xargs -I% ssh {{.NODE_IP}} sudo %
+    vars:
+      NODE_IP: '{{.NODE_IP}}'
+      PEER1_IP: '{{.PEER1_IP}}'
+      PEER2_IP: '{{.PEER2_IP}}'
+
+  create-machine-1:
     cmds:
       - task: create-machine
         vars:
           NAME: node01
           NODE_IP: '{{.NODE01_IP}}'
+
+  create-machine-2:
       - task: create-machine
         vars:
           NAME: node02
           NODE_IP: '{{.NODE02_IP}}'
 
-  delete-machines-host1:
+  create-machine-3:
+      - task: create-machine
+        vars:
+          NAME: node03
+          NODE_IP: '{{.NODE03_IP}}'
+
+  delete-machine-1:
     cmds:
       - task: delete-machine
         vars:
           NAME: node01
+
+  delete-machine-2:
       - task: delete-machine
         vars:
           NAME: node02
 
-  bootstrap-machines-host1:
+  delete-machine-3:
+      - task: delete-machine
+        vars:
+          NAME: node03
+
+  node-1:
     cmds:
-      - task: bootstrap-master
+      - task: init-control-plane-node
+        vars:
+          NODE_IP: '{{.NODE01_IP}}'
+          PEER1_IP: '{{.NODE02_IP}}'
+          PEER2_IP: '{{.NODE03_IP}}'
+
+  node-2:
+    cmds:
+      - task: bootstrap-control-plane-node
         vars:
           NODE_IP: '{{.NODE02_IP}}'
           PEER1_IP: '{{.NODE01_IP}}'
           PEER2_IP: '{{.NODE03_IP}}'
-          PEER3_IP: '{{.NODE04_IP}}'
 
-  host1:
+  node-3:
     cmds:
-      - task: delete-machines-host1
-      - task: create-machines-host1
-      - task: first-node
-      - task: bootstrap-machines-host1
-      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
-
-  create-machines-host2:
-    cmds:
-      - task: create-machine
-        vars:
-          NAME: node03
-          NODE_IP: '{{.NODE03_IP}}'
-      - task: create-machine
-        vars:
-          NAME: node04
-          NODE_IP: '{{.NODE04_IP}}'
-
-  delete-machines-host2:
-    cmds:
-      - task: delete-machine
-        vars:
-          NAME: node03
-      - task: delete-machine
-        vars:
-          NAME: node04
-
-  bootstrap-machines-host2:
-    cmds:
-      - task: bootstrap-master
+      - task: bootstrap-control-plane-node
         vars:
           NODE_IP: '{{.NODE03_IP}}'
           PEER1_IP: '{{.NODE01_IP}}'
           PEER2_IP: '{{.NODE02_IP}}'
-          PEER3_IP: '{{.NODE04_IP}}'
-      - task: bootstrap-master
-        vars:
-          NODE_IP: '{{.NODE04_IP}}'
-          PEER1_IP: '{{.NODE01_IP}}'
-          PEER2_IP: '{{.NODE02_IP}}'
-          PEER3_IP: '{{.NODE03_IP}}'
 
-  host2:
+  e2e-node-1:
     cmds:
-      - task: delete-machines-host2
-      - task: create-machines-host2
-      - task: bootstrap-machines-host2
-      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
+      - task: delete-machine-1
+      - task: create-machine-1
+      - sleep 30
+      - task: node-1
 
-  kubeconfig:
+  e2e-node-2:
+    cmds:
+      - task: delete-machine-2
+      - task: create-machine-2
+      - sleep 30
+      - task: node-2
+
+  e2e-node-3:
+    cmds:
+      - task: delete-machine-3
+      - task: create-machine-3
+      - sleep 30
+      - task: node-3
+
+  e2e:
+    cmds:
+      - task: e2e-node-1
+      - task: e2e-node-2
+      - task: e2e-node-3
+
+  delete-all:
+    cmds:
+      - task: delete-machine-1
+      - task: delete-machine-2
+      - task: delete-machine-3
+
+  create-kubeconfig:
     cmds:
       - mkdir -p ~/.kube
       - cp ~/.kube/config ~/.kube/config-backup
       - ssh {{.NODE01_IP}} sudo kubeadm kubeconfig user --client-name=sobeck > /tmp/sobeck.conf
       - ssh {{.NODE01_IP}} kubectl create clusterrolebinding sobeck-cluster-admin-binding --clusterrole=cluster-admin --user=sobeck
       - KUBECONFIG=~/.kube/config:/tmp/sobeck.conf kubectl config view --flatten > ~/.kube/config
+      - kubectl config set-cluster kubernetes --server=https://192.168.0.80:6443
