@@ -13,7 +13,6 @@ vars:
   NODE02_IP: 192.168.0.82
   NODE03_IP: 192.168.0.83
   NODE04_IP: 192.168.0.84
-  NODE05_IP: 192.168.0.85
 
 tasks:
   install:
@@ -63,7 +62,7 @@ tasks:
       - ssh {{.NODE_IP}} bash pre.sh
       - |
         ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
-          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
+          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}}
       - ssh {{.NODE01_IP}} bash join.sh | xargs -I% ssh {{.NODE_IP}} sudo %
       - ssh {{.NODE_IP}} bash kctl.sh
 
@@ -73,14 +72,13 @@ tasks:
       - ssh {{.NODE_IP}} bash pre.sh
       - |
         ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} \
-          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}} {{.PEER4_IP}}
+          {{.PEER1_IP}} {{.PEER2_IP}} {{.PEER3_IP}}
       - ssh {{.NODE_IP}} bash init.sh {{.LOADBALANCER_IP}}
     vars:
       NODE_IP: '{{.NODE01_IP}}'
       PEER1_IP: '{{.NODE02_IP}}'
       PEER2_IP: '{{.NODE03_IP}}'
       PEER3_IP: '{{.NODE04_IP}}'
-      PEER4_IP: '{{.NODE05_IP}}'
  
   create-machines-host1:
     cmds:
@@ -92,10 +90,6 @@ tasks:
         vars:
           NAME: node02
           NODE_IP: '{{.NODE02_IP}}'
-      - task: create-machine
-        vars:
-          NAME: node03
-          NODE_IP: '{{.NODE03_IP}}'
 
   delete-machines-host1:
     cmds:
@@ -105,9 +99,6 @@ tasks:
       - task: delete-machine
         vars:
           NAME: node02
-      - task: delete-machine
-        vars:
-          NAME: node03
 
   bootstrap-machines-host1:
     cmds:
@@ -117,14 +108,6 @@ tasks:
           PEER1_IP: '{{.NODE01_IP}}'
           PEER2_IP: '{{.NODE03_IP}}'
           PEER3_IP: '{{.NODE04_IP}}'
-          PEER4_IP: '{{.NODE05_IP}}'
-      - task: bootstrap-master
-        vars:
-          NODE_IP: '{{.NODE03_IP}}'
-          PEER1_IP: '{{.NODE01_IP}}'
-          PEER2_IP: '{{.NODE02_IP}}'
-          PEER3_IP: '{{.NODE04_IP}}'
-          PEER4_IP: '{{.NODE05_IP}}'
 
   host1:
     cmds:
@@ -138,38 +121,36 @@ tasks:
     cmds:
       - task: create-machine
         vars:
-          NAME: node04
-          NODE_IP: '{{.NODE04_IP}}'
+          NAME: node03
+          NODE_IP: '{{.NODE03_IP}}'
       - task: create-machine
         vars:
-          NAME: node05
-          NODE_IP: '{{.NODE05_IP}}'
+          NAME: node04
+          NODE_IP: '{{.NODE04_IP}}'
 
   delete-machines-host2:
     cmds:
       - task: delete-machine
         vars:
-          NAME: node04
+          NAME: node03
       - task: delete-machine
         vars:
-          NAME: node05
+          NAME: node04
 
   bootstrap-machines-host2:
     cmds:
+      - task: bootstrap-master
+        vars:
+          NODE_IP: '{{.NODE03_IP}}'
+          PEER1_IP: '{{.NODE01_IP}}'
+          PEER2_IP: '{{.NODE02_IP}}'
+          PEER3_IP: '{{.NODE04_IP}}'
       - task: bootstrap-master
         vars:
           NODE_IP: '{{.NODE04_IP}}'
           PEER1_IP: '{{.NODE01_IP}}'
           PEER2_IP: '{{.NODE02_IP}}'
           PEER3_IP: '{{.NODE03_IP}}'
-          PEER4_IP: '{{.NODE05_IP}}'
-      - task: bootstrap-master
-        vars:
-          NODE_IP: '{{.NODE05_IP}}'
-          PEER1_IP: '{{.NODE01_IP}}'
-          PEER2_IP: '{{.NODE02_IP}}'
-          PEER3_IP: '{{.NODE03_IP}}'
-          PEER4_IP: '{{.NODE04_IP}}'
 
   host2:
     cmds:

@@ -13,7 +13,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin, docker
     lock_passwd: false
-    plain_text_passwd: foobar12
+    passwd: PASSWD_HASH
     chpasswd:
       expire: False
     shell: /bin/bash

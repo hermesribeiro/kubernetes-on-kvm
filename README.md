@@ -1,22 +1,38 @@
 # Kubernetes on kvm
 
-Multi-host self-managed kubadm kubernetes cluster on top of kvm/qemu virtual machines provisioned with libvirt CLI.
+This repo showcases a kubernetes cluster I run on my homelab. It tries to use as much as much as possible cloud-native and linux native tools. The requirements were:
+
+* Use default kubernetes implementation
+* Nodes must run inside virtual machines for easy setup/teardown.
+* The VMs should not need any proprieary license.
+* It should be possible to SSH into any node from any node and from any local machine.
+* Any machine can be turned off at any point and the cluster should still keep running.
+
+To achieve those goals, the technologies involved were:
+
+* kubeadm to install kubernetes components
+* qemu/kvm to create the virtual machines
+* Ubuntu 22.04 as the node image
+* kube-vip to create a virtual IP load balancers
+* A bridge network
+* Weave-net for network policy
 
 ## Prerequisites
 
-* Linux
+* Linux host OS
 * [Task](https://taskfile.dev/installation/).
 * A network bridge. [Here](https://www.tecmint.com/create-network-bridge-in-ubuntu/) is a good tutorial and [here](https://www.core27.co/post/bridge-networks-for-kvm-on-ubuntu-2204-server) is a good explanation.
 
 ## Quickstart
 
-The steps below are intended to be run in two different machines. It will create a cluster with five control-plane nodes intended to be used also as worker nodes with the config below.
+The initial cluster architecture will run in two machines, with two nodes/VMs in each one using high availability setup. Due to the way kube-vip is used, any other node configuration requires manually editing the node IPs.
 
-| host1             | host2       |
-|-------------------|-------------|
-| node1 node2 node3 | node4 node5 |
+| host1       | host2       |
+|-------------|-------------|
+| node1 node2 | node3 node4 |
 
-Install the required packages and reboot the machine:
+
+To run it, install the required packages and reboot the machine:
 
 ```bash
 task install
@@ -44,7 +60,7 @@ PASSWD_HASH="Your hash here"
 
 Edit the IP adresses in the header of `Taskfile.yaml` to match your bridge network specs.
 
-Use the following in yout ~/.ssh/config and edit the host accordingly.
+Use the following in your ~/.ssh/config and edit the host accordingly.
 
 ```
 Host 192.168.0.8*
@@ -53,7 +69,7 @@ Host 192.168.0.8*
   User sobeck
   LogLevel QUIET
 ```
-Create the first host with three VMs and install kubernetes et.al.:
+Create the first host with two VMs and install kubernetes et.al.:
 
 ```bash
 task host1
@@ -86,3 +102,4 @@ virsh shutdown cloud-init-001
 ## TODO
 
 - Setup external ingress.
+- Change network policy provider
