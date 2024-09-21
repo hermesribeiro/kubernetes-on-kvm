@@ -12,6 +12,7 @@ vars:
   NODE01_IP: 192.168.0.81
   NODE02_IP: 192.168.0.82
   NODE03_IP: 192.168.0.83
+  STARTUP_WAIT_TIME: 30
 
 tasks:
   install:
@@ -150,21 +151,21 @@ tasks:
     cmds:
       - task: delete-machine-1
       - task: create-machine-1
-      - sleep 30
+      - sleep {{.STARTUP_WAIT_TIME}}
       - task: node-1
 
   e2e-node-2:
     cmds:
       - task: delete-machine-2
       - task: create-machine-2
-      - sleep 30
+      - sleep {{.STARTUP_WAIT_TIME}}
       - task: node-2
 
   e2e-node-3:
     cmds:
       - task: delete-machine-3
       - task: create-machine-3
-      - sleep 30
+      - sleep {{.STARTUP_WAIT_TIME}}
       - task: node-3
 
   e2e:
@@ -186,4 +187,4 @@ tasks:
       - ssh {{.NODE01_IP}} sudo kubeadm kubeconfig user --client-name=sobeck > /tmp/sobeck.conf
       - ssh {{.NODE01_IP}} kubectl create clusterrolebinding sobeck-cluster-admin-binding --clusterrole=cluster-admin --user=sobeck
       - KUBECONFIG=~/.kube/config:/tmp/sobeck.conf kubectl config view --flatten > ~/.kube/config
-      - kubectl config set-cluster kubernetes --server=https://192.168.0.80:6443
+      - kubectl config set-cluster kubernetes --server=https://{{.LOADBALANCER_IP}}:6443
