@@ -70,6 +70,7 @@ tasks:
           PEER1_IP: '{{.PEER1_IP}}'
           PEER2_IP: '{{.PEER2_IP}}'
       - ssh {{.NODE_IP}} bash init.sh {{.LOADBALANCER_IP}}
+      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
     vars:
       NODE_IP: '{{.NODE_IP}}'
       PEER1_IP: '{{.PEER1_IP}}'
@@ -83,6 +84,7 @@ tasks:
           PEER1_IP: '{{.PEER1_IP}}'
           PEER2_IP: '{{.PEER2_IP}}'
       - ssh {{.NODE01_IP}} bash join.sh | xargs -I% ssh {{.NODE_IP}} sudo %
+      - ssh {{.NODE01_IP}} kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule- || true
     vars:
       NODE_IP: '{{.NODE_IP}}'
       PEER1_IP: '{{.PEER1_IP}}'
