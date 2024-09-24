@@ -6,6 +6,7 @@ vars:
   MEMORY: 3000
   VCPU: 2
   DISK_SIZE: 20
+  DATA_DISK_SIZE: 5
   BRIDGE_NAME: br0
   GATEWAY_IP: 192.168.0.1
   LOADBALANCER_IP: 192.168.0.80
@@ -48,6 +49,7 @@ tasks:
           --disk=size={{.DISK_SIZE}},backing_store="$(pwd)/jammy-server-cloudimg-amd64.img" \
           --cloud-init user-data=configs/{{.NAME}}-user-data.yaml,network-config=configs/{{.NAME}}-network-config.yaml \
           --network bridge={{.BRIDGE_NAME}},model=virtio \
+          --disk=path=/var/lib/libvirt/images/{{.NAME}}-data-1,size={{.DATA_DISK_SIZE}}
       - virsh start {{.NAME}}
 
   delete-machine:
@@ -55,10 +57,12 @@ tasks:
       - virsh destroy {{.NAME}} || true
       - virsh undefine --domain {{.NAME}} || true
       - sudo rm /var/lib/libvirt/images/{{.NAME}}.qcow2 || true
+      - sudo rm /var/lib/libvirt/images/{{.NAME}}-data-1 || true
 
   prepare-control-plane-node:
     cmds:
       - scp scripts/* {{.NODE_IP}}:/home/sobeck
+      - ssh {{.NODE_IP}} bash mount.sh
       - ssh {{.NODE_IP}} bash pre.sh
       - ssh {{.NODE_IP}} bash vip.sh {{.NODE_IP}} {{.LOADBALANCER_IP}} {{.PEER1_IP}} {{.PEER2_IP}}
 
